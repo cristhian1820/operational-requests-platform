@@ -59,7 +59,8 @@ services:
       REQUESTS_DB_USER: sa
       REQUESTS_DB_PASSWORD: "${SQLSERVER_OPERATIONAL_PASSWORD}"
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      OIDC_ISSUER_URI: http://keycloak:8080/realms/operational-requests
+      OIDC_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8080}/realms/operational-requests
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/operational-requests/protocol/openid-connect/certs
     ports: ["${REQUESTS_SERVICE_PORT:-18081}:8081"]
     depends_on: { sqlserver-operational-init: { condition: service_completed_successfully }, kafka: { condition: service_healthy }, keycloak: { condition: service_healthy } }
     healthcheck: { test: ["CMD-SHELL", "bash -c \"exec 3<>/dev/tcp/127.0.0.1/8081; printf 'GET /actuator/health HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q 'HTTP/1.1 200' <&3\""], interval: 10s, timeout: 5s, retries: 15, start_period: 30s }

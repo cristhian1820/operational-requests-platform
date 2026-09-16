@@ -1,0 +1,15 @@
+package co.com.operationalrequests.requests.infrastructure.adapter.in.rest;
+import co.com.operationalrequests.requests.application.port.in.RequestsUseCase; import co.com.operationalrequests.requests.infrastructure.security.*; import java.util.*;
+import org.junit.jupiter.api.Test; import org.springframework.beans.factory.annotation.Autowired; import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest; import org.springframework.boot.test.mock.mockito.MockBean; import org.springframework.context.annotation.Import; import org.springframework.http.MediaType; import org.springframework.security.oauth2.jwt.JwtDecoder; import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import static org.mockito.Mockito.*; import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt; import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*; import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@WebMvcTest(RequestsController.class) @Import({SecurityConfig.class,JwtActorMapper.class,CorrelationIdFilter.class,GlobalExceptionHandler.class})
+class RequestsControllerTest {
+ @Autowired MockMvc mvc; @MockBean RequestsUseCase useCase; @MockBean JwtDecoder decoder;
+ private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor role(String role){return jwt().jwt(j->j.subject(UUID.randomUUID().toString()).claim("realm_access",Map.of("roles",List.of(role)))).authorities(new SimpleGrantedAuthority("ROLE_"+role));}
+ @Test void unauthenticatedReturnsProblem401()throws Exception{mvc.perform(get("/api/v1/categorias")).andExpect(status().isUnauthorized()).andExpect(header().exists("X-Correlation-Id")).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)).andExpect(jsonPath("$.correlationId").isNotEmpty());}
+ @Test void wrongRoleReturns403()throws Exception{mvc.perform(post("/api/v1/solicitudes").with(role("ANALISTA")).contentType(MediaType.APPLICATION_JSON).content("{\"asunto\":\"A\",\"descripcion\":\"D\",\"categoriaId\":\"11111111-1111-1111-1111-111111111111\",\"prioridad\":\"MEDIA\"}")).andExpect(status().isForbidden());verifyNoInteractions(useCase);}
+ @Test void invalidBodyReturns400Problem()throws Exception{mvc.perform(post("/api/v1/solicitudes").with(role("SOLICITANTE")).contentType(MediaType.APPLICATION_JSON).content("{\"asunto\":\"\",\"descripcion\":\"\"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));}
+ @Test void invalidUuidReturns400()throws Exception{mvc.perform(get("/api/v1/solicitudes/no-es-uuid").with(role("ANALISTA"))).andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));}
+ @Test void categoriesRequireSupportedAuthenticatedRole()throws Exception{when(useCase.categories()).thenReturn(List.of());mvc.perform(get("/api/v1/categorias").with(role("SOLICITANTE"))).andExpect(status().isOk()).andExpect(content().json("[]"));}
+}

@@ -1,28 +1,17 @@
 # Contrato de eventos v1
 
-Todos los eventos usan el sobre siguiente. `aggregateId` (UUID de la solicitud) es la clave de partición Kafka para conservar orden por agregado. `version` empieza en `1` y solo aumenta ante cambios incompatibles, manteniendo consumidores tolerantes a campos nuevos.
+El Outbox persiste el sobre JSON completo. `aggregateId` —UUID de solicitud— será la clave de partición Kafka para preservar orden por agregado. `version` empieza en `1`; campos aditivos no lo incrementan, cambios incompatibles sí.
 
 ```json
-{"eventId":"9f247210-e250-48d6-9c17-132c9d4450b2","occurredAt":"2026-09-16T14:30:00Z","aggregateId":"2eb194f2-f94c-4d3e-94aa-535295432098","type":"SolicitudRegistrada","version":1,"correlationId":"d21b4ff2-ab4d-4b36-907c-cf7ae5758b40","payload":{"requestNumber":"SOL-2026-000001","categoryId":"11111111-1111-1111-1111-111111111111","priority":"MEDIA","actorRole":"SOLICITANTE"}}
+{"eventId":"9f247210-e250-48d6-9c17-132c9d4450b2","occurredAt":"2026-09-16T14:30:00Z","aggregateId":"2eb194f2-f94c-4d3e-94aa-535295432098","type":"SolicitudRegistrada","version":1,"correlationId":"d21b4ff2-ab4d-4b36-907c-cf7ae5758b40","payload":{"requestId":"2eb194f2-f94c-4d3e-94aa-535295432098","readableId":"SOL-2026-000001","categoryId":"11111111-1111-1111-1111-111111111111","status":"REGISTRADA","priority":"MEDIA","actorRole":"SOLICITANTE","occurredAt":"2026-09-16T14:30:00Z"}}
 ```
 
-Tipos y payloads:
+Los tipos implementados son `SolicitudRegistrada`, `SolicitudTomada`, `SolicitudResuelta` y `SolicitudCerrada`. Todos llevan `requestId`, `readableId`, `categoryId`, `status`, `priority`, `actorRole` y `occurredAt`; `SolicitudTomada` añade `fromStatus`. No contienen asunto, descripción, correo ni nombre. La devolución de RESUELTA a EN_ATENCION queda en historial y no emite evento v1.
 
-- `SolicitudRegistrada`: `requestNumber`, `categoryId`, `priority`, `actorRole`.
-- `SolicitudTomada`: `fromStatus`, `toStatus`, `actorRole`.
-- `SolicitudResuelta`: `fromStatus`, `toStatus`, `actorRole`.
-- `SolicitudCerrada`: `fromStatus`, `toStatus`, `actorRole`.
-
-Ejemplos de transición (cada objeto es JSON válido):
+Ejemplo de transición:
 
 ```json
-{"eventId":"a6c79401-4bc7-4e9b-8240-83430631372f","occurredAt":"2026-09-16T14:35:00Z","aggregateId":"2eb194f2-f94c-4d3e-94aa-535295432098","type":"SolicitudTomada","version":1,"correlationId":"d21b4ff2-ab4d-4b36-907c-cf7ae5758b40","payload":{"fromStatus":"REGISTRADA","toStatus":"EN_ATENCION","actorRole":"ANALISTA"}}
-```
-```json
-{"eventId":"b59851bf-d75a-4eb6-97a0-13544577d990","occurredAt":"2026-09-16T15:20:00Z","aggregateId":"2eb194f2-f94c-4d3e-94aa-535295432098","type":"SolicitudResuelta","version":1,"correlationId":"d21b4ff2-ab4d-4b36-907c-cf7ae5758b40","payload":{"fromStatus":"EN_ATENCION","toStatus":"RESUELTA","actorRole":"ANALISTA"}}
-```
-```json
-{"eventId":"456f55c1-7004-437c-a16a-b0dcc08b431a","occurredAt":"2026-09-16T16:00:00Z","aggregateId":"2eb194f2-f94c-4d3e-94aa-535295432098","type":"SolicitudCerrada","version":1,"correlationId":"d21b4ff2-ab4d-4b36-907c-cf7ae5758b40","payload":{"fromStatus":"RESUELTA","toStatus":"CERRADA","actorRole":"SOLICITANTE"}}
+{"eventId":"456f55c1-7004-437c-a16a-b0dcc08b431a","occurredAt":"2026-09-16T16:00:00Z","aggregateId":"2eb194f2-f94c-4d3e-94aa-535295432098","type":"SolicitudCerrada","version":1,"correlationId":"d21b4ff2-ab4d-4b36-907c-cf7ae5758b40","payload":{"requestId":"2eb194f2-f94c-4d3e-94aa-535295432098","readableId":"SOL-2026-000001","categoryId":"11111111-1111-1111-1111-111111111111","status":"CERRADA","priority":"MEDIA","actorRole":"SUPERVISOR","occurredAt":"2026-09-16T16:00:00Z"}}
 ```
 
-La transacción de negocio inserta el evento en `outbox_event`; un publicador posterior lo envía y marca como publicado. Nunca se publica antes del commit. Los reintentos conservan `eventId`. Kafka y el publicador ofrecen semántica al menos una vez, por lo que el consumidor primero registra `eventId` en `processed_event`; la restricción única convierte duplicados en no-op.
+Solicitud, historial y Outbox `PENDING` confirman juntos. El publicador futuro reutilizará el mismo `eventId` en cada reintento. Como la entrega será al menos una vez, el consumidor deberá insertar primero `eventId` en `processed_event`; su restricción única convierte una repetición en no-op.

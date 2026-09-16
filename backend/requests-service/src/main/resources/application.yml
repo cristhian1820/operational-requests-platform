@@ -1,5 +1,7 @@
 spring:
   application.name: requests-service
+  jackson:
+    time-zone: UTC
   datasource:
     url: ${REQUESTS_DB_URL:jdbc:sqlserver://localhost:1433;databaseName=operational_requests;encrypt=true;trustServerCertificate=true}
     username: ${REQUESTS_DB_USER:sa}
@@ -7,10 +9,17 @@ spring:
   jpa:
     open-in-view: false
     hibernate.ddl-auto: validate
+    properties:
+      hibernate.type.preferred_instant_jdbc_type: TIMESTAMP
   flyway:
     enabled: true
   kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-  security.oauth2.resourceserver.jwt.issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8080/realms/operational-requests}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8080/realms/operational-requests}
+          jwk-set-uri: ${OIDC_JWK_SET_URI:${OIDC_ISSUER_URI:http://localhost:8080/realms/operational-requests}/protocol/openid-connect/certs}
 server.port: ${REQUESTS_SERVICE_PORT:8081}
 management:
   endpoints.web.exposure.include: health,info

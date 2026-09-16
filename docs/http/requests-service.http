@@ -1,0 +1,60 @@
+@baseUrl = http://localhost:18081/api/v1
+@solicitanteToken = TOKEN_JWT_SOLICITANTE_FICTICIO
+@analistaToken = TOKEN_JWT_ANALISTA_FICTICIO
+@supervisorToken = TOKEN_JWT_SUPERVISOR_FICTICIO
+@categoriaId = 11111111-1111-1111-1111-111111111111
+@solicitudId = REEMPLAZAR_UUID_SOLICITUD
+@correlationId = 22222222-2222-2222-2222-222222222222
+
+### Categorías activas
+GET {{baseUrl}}/categorias
+Authorization: Bearer {{solicitanteToken}}
+
+### Crear
+POST {{baseUrl}}/solicitudes
+Authorization: Bearer {{solicitanteToken}}
+Content-Type: application/json
+X-Correlation-Id: {{correlationId}}
+
+{"asunto":"Falla de acceso","descripcion":"No es posible ingresar al sistema local","categoriaId":"{{categoriaId}}","prioridad":"MEDIA"}
+
+### Listar
+GET {{baseUrl}}/solicitudes?page=0&size=20&estado=REGISTRADA&prioridad=MEDIA
+Authorization: Bearer {{analistaToken}}
+
+### Detalle
+GET {{baseUrl}}/solicitudes/{{solicitudId}}
+Authorization: Bearer {{analistaToken}}
+
+### Tomar
+POST {{baseUrl}}/solicitudes/{{solicitudId}}/asignaciones
+Authorization: Bearer {{analistaToken}}
+X-Correlation-Id: {{correlationId}}
+
+### Agregar observación
+POST {{baseUrl}}/solicitudes/{{solicitudId}}/observaciones
+Authorization: Bearer {{analistaToken}}
+Content-Type: application/json
+
+{"texto":"Diagnóstico en curso"}
+
+### Resolver
+POST {{baseUrl}}/solicitudes/{{solicitudId}}/transiciones
+Authorization: Bearer {{analistaToken}}
+Content-Type: application/json
+
+{"estadoDestino":"RESUELTA","observacion":"Servicio restaurado"}
+
+### Devolver a atención
+POST {{baseUrl}}/solicitudes/{{solicitudId}}/transiciones
+Authorization: Bearer {{supervisorToken}}
+Content-Type: application/json
+
+{"estadoDestino":"EN_ATENCION","motivo":"Falta evidencia de validación"}
+
+### Cerrar
+POST {{baseUrl}}/solicitudes/{{solicitudId}}/transiciones
+Authorization: Bearer {{supervisorToken}}
+Content-Type: application/json
+
+{"estadoDestino":"CERRADA","motivo":"Resultado validado"}

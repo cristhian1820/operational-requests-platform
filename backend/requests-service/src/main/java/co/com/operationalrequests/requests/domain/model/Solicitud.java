@@ -1,5 +1,6 @@
 package co.com.operationalrequests.requests.domain.model;
 
+import co.com.operationalrequests.requests.domain.exception.AccesoDominioNoPermitidoException;
 import co.com.operationalrequests.requests.domain.exception.TransicionEstadoInvalidaException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -18,56 +19,119 @@ public final class Solicitud {
 
     private final UUID id;
     private final String numero;
-    private final Categoria categoria;
+    private final String asunto;
+    private final UUID categoriaId;
     private final UUID solicitanteId;
     private final Prioridad prioridad;
     private final String descripcion;
     private final Instant creadaEn;
-    private final List<HistorialEstado> historial = new ArrayList<>();
+    private final List<Observacion> observaciones;
+    private final List<HistorialEstado> historial;
     private EstadoSolicitud estado;
+    private UUID analistaAsignadoId;
+    private Instant actualizadaEn;
+    private long version;
 
-    public Solicitud(
-            UUID id,
-            String numero,
-            Categoria categoria,
-            UUID solicitanteId,
-            Prioridad prioridad,
-            String descripcion,
-            Instant creadaEn) {
-        this.id = Objects.requireNonNull(id, "El id es obligatorio");
-        this.numero = textoObligatorio(numero, "El número de solicitud es obligatorio");
-        this.categoria = Objects.requireNonNull(categoria, "La categoría es obligatoria");
-        this.solicitanteId = Objects.requireNonNull(solicitanteId, "El solicitante es obligatorio");
-        this.prioridad = Objects.requireNonNull(prioridad, "La prioridad es obligatoria");
-        this.descripcion = textoObligatorio(descripcion, "La descripción es obligatoria");
-        this.creadaEn = Objects.requireNonNull(creadaEn, "La fecha de creación es obligatoria");
-        this.estado = EstadoSolicitud.REGISTRADA;
+    private Solicitud(UUID id, String numero, String asunto, UUID categoriaId, UUID solicitanteId,
+            Prioridad prioridad, String descripcion, EstadoSolicitud estado, UUID analistaAsignadoId,
+            Instant creadaEn, Instant actualizadaEn, long version, List<Observacion> observaciones,
+            List<HistorialEstado> historial) {
+        this.id = Objects.requireNonNull(id);
+        this.numero = requerido(numero, "El número es obligatorio", 24);
+        this.asunto = requerido(asunto, "El asunto es obligatorio", 200);
+        this.categoriaId = Objects.requireNonNull(categoriaId);
+        this.solicitanteId = Objects.requireNonNull(solicitanteId);
+        this.prioridad = Objects.requireNonNull(prioridad);
+        this.descripcion = requerido(descripcion, "La descripción es obligatoria", 2000);
+        this.estado = Objects.requireNonNull(estado);
+        this.analistaAsignadoId = analistaAsignadoId;
+        this.creadaEn = Objects.requireNonNull(creadaEn);
+        this.actualizadaEn = Objects.requireNonNull(actualizadaEn);
+        this.version = version;
+        this.observaciones = new ArrayList<>(observaciones);
+        this.historial = new ArrayList<>(historial);
     }
 
-    public void cambiarEstado(EstadoSolicitud nuevo, UUID actorId, RolActor rol, Instant ocurridoEn) {
-        Objects.requireNonNull(nuevo, "El estado destino es obligatorio");
-        Objects.requireNonNull(actorId, "El actor es obligatorio");
-        Objects.requireNonNull(rol, "El rol del actor es obligatorio");
-        Objects.requireNonNull(ocurridoEn, "La fecha de transición es obligatoria");
+    public static Solicitud crear(UUID id, String numero, String asunto, UUID categoriaId,
+            UUID solicitanteId, Prioridad prioridad, String descripcion, Instant ahora) {
+        var inicial = new HistorialEstado(UUID.randomUUID(), null, EstadoSolicitud.REGISTRADA,
+                solicitanteId, RolActor.SOLICITANTE, null, ahora);
+        return new Solicitud(id, numero, asunto, categoriaId, solicitanteId, prioridad, descripcion,
+                EstadoSolicitud.REGISTRADA, null, ahora, ahora, 0, List.of(), List.of(inicial));
+    }
 
-        if (!TRANSICIONES.getOrDefault(estado, Set.of()).contains(nuevo)) {
-            throw new TransicionEstadoInvalidaException(estado, nuevo);
+    public static Solicitud reconstruir(UUID id, String numero, String asunto, UUID categoriaId,
+            UUID solicitanteId, Prioridad prioridad, String descripcion, EstadoSolicitud estado,
+            UUID analistaAsignadoId, Instant creadaEn, Instant actualizadaEn, long version,
+            List<Observacion> observaciones, List<HistorialEstado> historial) {
+        return new Solicitud(id, numero, asunto, categoriaId, solicitanteId, prioridad, descripcion,
+                estado, analistaAsignadoId, creadaEn, actualizadaEn, version, observaciones, historial);
+    }
+
+    public void tomar(UUID analistaId, Instant ahora) {
+        transicionar(EstadoSolicitud.EN_ATENCION, analistaId, RolActor.ANALISTA, null, ahora);
+        analistaAsignadoId = analistaId;
+    }
+
+    public void agregarObservacion(UUID actorId, RolActor rol, String texto, Instant ahora) {
+        if (rol != RolActor.ANALISTA || !actorId.equals(analistaAsignadoId)) {
+            throw new AccesoDominioNoPermitidoException("Solo el analista asignado puede agregar observaciones");
         }
+        observaciones.add(new Observacion(UUID.randomUUID(), actorId, rol, texto, ahora));
+        actualizadaEn = ahora;
+    }
 
+    public void resolver(UUID analistaId, String observacion, Instant ahora) {
+        if (!analistaId.equals(analistaAsignadoId)) {
+            throw new AccesoDominioNoPermitidoException("Solo el analista asignado puede resolver la solicitud");
+        }
+        if (observacion != null && !observacion.isBlank()) {
+            agregarObservacion(analistaId, RolActor.ANALISTA, observacion, ahora);
+        }
+        transicionar(EstadoSolicitud.RESUELTA, analistaId, RolActor.ANALISTA, null, ahora);
+    }
+
+    public void devolver(UUID supervisorId, String motivo, Instant ahora) {
+        transicionar(EstadoSolicitud.EN_ATENCION, supervisorId, RolActor.SUPERVISOR,
+                requerido(motivo, "El motivo es obligatorio", 500), ahora);
+    }
+
+    public void cerrar(UUID supervisorId, String motivo, Instant ahora) {
+        transicionar(EstadoSolicitud.CERRADA, supervisorId, RolActor.SUPERVISOR,
+                requerido(motivo, "El motivo es obligatorio", 500), ahora);
+    }
+
+    /**
+     * Aplica la maquina de estados sin asociarla a un permiso HTTP concreto. Los casos de uso
+     * siguen siendo responsables de decidir qué rol puede solicitar cada transición.
+     */
+    public void cambiarEstado(EstadoSolicitud destino, UUID actorId, RolActor rol, String motivo, Instant ahora) {
+        transicionar(destino, actorId, rol, motivo, ahora);
+    }
+
+    private void transicionar(EstadoSolicitud destino, UUID actorId, RolActor rol, String motivo, Instant ahora) {
+        Objects.requireNonNull(destino); Objects.requireNonNull(actorId); Objects.requireNonNull(rol); Objects.requireNonNull(ahora);
+        if (!TRANSICIONES.getOrDefault(estado, Set.of()).contains(destino)) {
+            throw new TransicionEstadoInvalidaException(estado, destino);
+        }
         EstadoSolicitud anterior = estado;
-        estado = nuevo;
-        historial.add(new HistorialEstado(UUID.randomUUID(), anterior, nuevo, actorId, rol, ocurridoEn));
+        estado = destino;
+        actualizadaEn = ahora;
+        historial.add(new HistorialEstado(UUID.randomUUID(), anterior, destino, actorId, rol, motivo, ahora));
     }
 
-    private static String textoObligatorio(String valor, String mensaje) {
-        if (valor == null || valor.isBlank()) {
-            throw new IllegalArgumentException(mensaje);
-        }
-        return valor.trim();
+    private static String requerido(String valor, String mensaje, int maximo) {
+        if (valor == null || valor.isBlank()) throw new IllegalArgumentException(mensaje);
+        String limpio = valor.trim();
+        if (limpio.length() > maximo) throw new IllegalArgumentException("Longitud máxima excedida: " + maximo);
+        return limpio;
     }
 
-    public UUID id() { return id; }
-    public String numero() { return numero; }
-    public EstadoSolicitud estado() { return estado; }
+    public UUID id() { return id; } public String numero() { return numero; } public String asunto() { return asunto; }
+    public UUID categoriaId() { return categoriaId; } public UUID solicitanteId() { return solicitanteId; }
+    public Prioridad prioridad() { return prioridad; } public String descripcion() { return descripcion; }
+    public EstadoSolicitud estado() { return estado; } public UUID analistaAsignadoId() { return analistaAsignadoId; }
+    public Instant creadaEn() { return creadaEn; } public Instant actualizadaEn() { return actualizadaEn; }
+    public long version() { return version; } public List<Observacion> observaciones() { return List.copyOf(observaciones); }
     public List<HistorialEstado> historial() { return List.copyOf(historial); }
 }
