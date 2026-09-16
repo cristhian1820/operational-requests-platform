@@ -1,0 +1,3 @@
+package co.com.operationalrequests.requests.infrastructure.adapter.in.scheduler;
+import co.com.operationalrequests.requests.application.usecase.OutboxPublisherService; import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty; import org.springframework.scheduling.annotation.Scheduled; import org.springframework.stereotype.Component;
+@Component @ConditionalOnProperty(name="outbox.enabled",havingValue="true",matchIfMissing=true) public class OutboxScheduler { private final OutboxPublisherService service; public OutboxScheduler(OutboxPublisherService service){this.service=service;} @Scheduled(fixedDelayString="${outbox.poll-interval-ms:2000}") public void publish(){service.publishBatch();} }

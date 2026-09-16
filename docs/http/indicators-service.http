@@ -1,0 +1,11 @@
+@baseUrl = http://localhost:8082/api/v1/indicadores
+@supervisorToken = TOKEN_JWT_SUPERVISOR_FICTICIO
+@analistaToken = TOKEN_JWT_ANALISTA_FICTICIO
+
+### Resumen global
+GET {{baseUrl}}/resumen
+Authorization: Bearer {{supervisorToken}}
+
+### Tendencia UTC (máximo 366 días)
+GET {{baseUrl}}/tendencia?desde=2026-09-01&hasta=2026-09-30
+Authorization: Bearer {{analistaToken}}

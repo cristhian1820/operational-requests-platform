@@ -59,6 +59,12 @@ services:
       REQUESTS_DB_USER: sa
       REQUESTS_DB_PASSWORD: "${SQLSERVER_OPERATIONAL_PASSWORD}"
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_EVENTS_TOPIC: "${KAFKA_EVENTS_TOPIC:-operational-requests.events.v1}"
+      OUTBOX_BATCH_SIZE: "${OUTBOX_BATCH_SIZE:-20}"
+      OUTBOX_POLL_INTERVAL_MS: "${OUTBOX_POLL_INTERVAL_MS:-2000}"
+      OUTBOX_MAX_ATTEMPTS: "${OUTBOX_MAX_ATTEMPTS:-5}"
+      OUTBOX_BACKOFF_SECONDS: "${OUTBOX_BACKOFF_SECONDS:-10}"
+      OUTBOX_LOCK_TIMEOUT_SECONDS: "${OUTBOX_LOCK_TIMEOUT_SECONDS:-60}"
       OIDC_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8080}/realms/operational-requests
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/operational-requests/protocol/openid-connect/certs
     ports: ["${REQUESTS_SERVICE_PORT:-18081}:8081"]
@@ -72,7 +78,11 @@ services:
       INDICATORS_DB_USER: sa
       INDICATORS_DB_PASSWORD: "${SQLSERVER_ANALYTICS_PASSWORD}"
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      OIDC_ISSUER_URI: http://keycloak:8080/realms/operational-requests
+      KAFKA_EVENTS_TOPIC: "${KAFKA_EVENTS_TOPIC:-operational-requests.events.v1}"
+      KAFKA_EVENTS_DLT_TOPIC: "${KAFKA_EVENTS_DLT_TOPIC:-operational-requests.events.v1.dlt}"
+      KAFKA_CONSUMER_CONCURRENCY: "${KAFKA_CONSUMER_CONCURRENCY:-1}"
+      OIDC_ISSUER_URI: http://localhost:${KEYCLOAK_PORT:-8080}/realms/operational-requests
+      OIDC_JWK_SET_URI: http://keycloak:8080/realms/operational-requests/protocol/openid-connect/certs
     ports: ["${INDICATORS_SERVICE_PORT:-8082}:8082"]
     depends_on: { sqlserver-analytics-init: { condition: service_completed_successfully }, kafka: { condition: service_healthy }, keycloak: { condition: service_healthy } }
     healthcheck: { test: ["CMD-SHELL", "bash -c \"exec 3<>/dev/tcp/127.0.0.1/8082; printf 'GET /actuator/health HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q 'HTTP/1.1 200' <&3\""], interval: 10s, timeout: 5s, retries: 15, start_period: 30s }

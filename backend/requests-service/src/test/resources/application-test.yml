@@ -4,3 +4,4 @@ spring:
   jpa.hibernate.ddl-auto: none
   security.oauth2.resourceserver.jwt.issuer-uri: http://localhost/test-issuer
   security.oauth2.resourceserver.jwt.jwk-set-uri: http://localhost/test-jwks
+outbox.enabled: false

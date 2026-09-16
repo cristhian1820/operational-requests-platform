@@ -1,0 +1,5 @@
+package co.com.operationalrequests.indicators.messaging;
+import co.com.operationalrequests.indicators.application.*; import org.slf4j.*; import org.springframework.context.annotation.Profile; import org.springframework.kafka.annotation.KafkaListener; import org.springframework.kafka.support.Acknowledgment; import org.springframework.stereotype.Component;
+@Component @Profile("!test") public class RequestEventsListener { private static final Logger log=LoggerFactory.getLogger(RequestEventsListener.class);private final AnalyticsService service;public RequestEventsListener(AnalyticsService service){this.service=service;}
+ @KafkaListener(topics="${events.topic:operational-requests.events.v1}",containerFactory="eventsKafkaListenerContainerFactory") public void consume(String value,Acknowledgment ack){var outcome=service.process(value);ack.acknowledge();if(outcome.result()==IndicatorDtos.ProcessingResult.DUPLICATE)log.info("Evento duplicado ignorado eventId={} type={}",outcome.eventId(),outcome.type());else log.info("Evento procesado eventId={} type={}",outcome.eventId(),outcome.type());}
+}

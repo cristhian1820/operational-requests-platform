@@ -1,18 +1,35 @@
 spring:
   application.name: indicators-service
+  jackson.time-zone: UTC
   datasource:
     url: ${INDICATORS_DB_URL:jdbc:sqlserver://localhost:1434;databaseName=operational_indicators;encrypt=true;trustServerCertificate=true}
     username: ${INDICATORS_DB_USER:sa}
     password: ${INDICATORS_DB_PASSWORD}
-  jpa: { open-in-view: false, hibernate.ddl-auto: validate }
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: validate
   flyway.enabled: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: ${KAFKA_INDICATORS_GROUP:indicators-service-v1}
       enable-auto-commit: false
-  security.oauth2.resourceserver.jwt.issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8080/realms/operational-requests}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+  security.oauth2.resourceserver.jwt:
+    issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8080/realms/operational-requests}
+    jwk-set-uri: ${OIDC_JWK_SET_URI:${OIDC_ISSUER_URI:http://localhost:8080/realms/operational-requests}/protocol/openid-connect/certs}
 server.port: ${INDICATORS_SERVICE_PORT:8082}
 management:
   endpoints.web.exposure.include: health,info
   endpoint.health.probes.enabled: true
+springdoc.swagger-ui.path: /swagger-ui.html
+events:
+  topic: ${KAFKA_EVENTS_TOPIC:operational-requests.events.v1}
+  dlt-topic: ${KAFKA_EVENTS_DLT_TOPIC:operational-requests.events.v1.dlt}
+  concurrency: ${KAFKA_CONSUMER_CONCURRENCY:1}

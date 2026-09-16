@@ -1,11 +1,7 @@
 package co.com.operationalrequests.indicators.security;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
-@Configuration
-public class SecurityConfig {
- @Bean SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
-  return http.authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll().anyRequest().authenticated()).oauth2ResourceServer(oauth -> oauth.jwt(jwt -> {})).build();
- }
+import java.util.*; import org.springframework.context.annotation.*; import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity; import org.springframework.security.config.annotation.web.builders.HttpSecurity; import org.springframework.security.config.http.SessionCreationPolicy; import org.springframework.security.core.GrantedAuthority; import org.springframework.security.core.authority.SimpleGrantedAuthority; import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter; import org.springframework.security.web.SecurityFilterChain; import org.springframework.web.cors.*;
+@Configuration @EnableMethodSecurity public class SecurityConfig {
+ @Bean JwtAuthenticationConverter jwtAuthenticationConverter(){var c=new JwtAuthenticationConverter();c.setJwtGrantedAuthoritiesConverter(jwt->{Map<String,Object> realm=jwt.getClaim("realm_access");Object roles=realm==null?null:realm.get("roles");if(!(roles instanceof Collection<?> values))return List.of();return values.stream().map(String::valueOf).map(r->(GrantedAuthority)new SimpleGrantedAuthority("ROLE_"+r)).toList();});return c;}
+ @Bean SecurityFilterChain apiSecurity(HttpSecurity http,JwtAuthenticationConverter converter)throws Exception{return http.csrf(c->c.disable()).cors(c->c.configurationSource(cors())).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests(a->a.requestMatchers("/actuator/health","/actuator/health/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll().anyRequest().authenticated()).oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(converter))).build();}
+ @Bean CorsConfigurationSource cors(){var c=new CorsConfiguration();c.setAllowedOrigins(List.of("http://localhost:4200","http://localhost:4201"));c.setAllowedMethods(List.of("GET","OPTIONS"));c.setAllowedHeaders(List.of("Authorization","Content-Type","X-Correlation-Id"));c.setAllowCredentials(false);var source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/api/**",c);return source;}
 }

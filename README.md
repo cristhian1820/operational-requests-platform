@@ -1,86 +1,61 @@
-# Operational Requests Platform — Fase 2
+# Operational Requests Platform — Fase 3
 
-API operacional de solicitudes sobre Java 21, Spring Boot, SQL Server, Keycloak y arquitectura hexagonal. `requests-service` implementa el ciclo operacional; `indicators-service` conserva los cimientos analíticos de Fase 1.
+Plataforma Java 21 con API operacional, Outbox transaccional, Kafka KRaft e indicadores idempotentes sobre SQL Server.
 
-## Ejecución local
+## Arranque local
 
-Requisitos: Git, Java 21, Docker con Compose y al menos 6 GB libres. El Wrapper usa Maven 3.9.11.
+Requisitos: Java 21, Docker Compose y al menos 6 GB libres.
 
 PowerShell:
 
 ```powershell
-git clone <URL_DEL_REPOSITORIO>
-Set-Location operational-requests-platform
 Copy-Item .env.example .env
 .\mvnw.cmd clean verify
 docker compose --env-file .env config --quiet
 docker compose --env-file .env up --build -d
 docker compose --env-file .env ps
-Invoke-RestMethod http://localhost:18081/actuator/health
-Invoke-RestMethod http://localhost:8082/actuator/health
-Invoke-RestMethod http://localhost:8080/realms/operational-requests/.well-known/openid-configuration
 ```
 
 Bash:
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
-cd operational-requests-platform
 cp .env.example .env
 ./mvnw clean verify
 docker compose --env-file .env config --quiet
 docker compose --env-file .env up --build -d
 docker compose --env-file .env ps
-curl --fail http://localhost:18081/actuator/health
-curl --fail http://localhost:8082/actuator/health
-curl --fail http://localhost:8080/realms/operational-requests/.well-known/openid-configuration
 ```
 
-Para detener sin borrar volúmenes: `docker compose --env-file .env down`. `.env` está ignorado; `.env.example` contiene exclusivamente credenciales ficticias locales.
+Detener conservando volúmenes: `docker compose --env-file .env down`.
 
-## API operacional
+## Flujo de eventos
 
-Base: `http://localhost:18081/api/v1`. Todos los endpoints requieren Bearer JWT. Swagger UI y OpenAPI son públicos **solo para desarrollo local** en `/swagger-ui.html` y `/v3/api-docs`; la API sigue protegida.
+`requests-service` confirma primero negocio y Outbox. El scheduler reclama lotes pequeños atómicamente, publica en `operational-requests.events.v1` con `aggregateId` como key y marca `PUBLISHED` después del ack. Fallos usan backoff lineal, máximo configurable y recuperación de locks vencidos. La entrega es al menos una vez.
 
-| Método y ruta | Rol |
-|---|---|
-| `GET /categorias` | cualquier rol operacional |
-| `POST /solicitudes` | SOLICITANTE |
-| `GET /solicitudes?page=0&size=20&estado=&categoriaId=&prioridad=` | todos; SOLICITANTE solo propias |
-| `GET /solicitudes/{id}` | todos; SOLICITANTE solo propia |
-| `POST /solicitudes/{id}/asignaciones` | ANALISTA |
-| `POST /solicitudes/{id}/observaciones` | ANALISTA asignado |
-| `POST /solicitudes/{id}/transiciones` | ANALISTA resuelve; SUPERVISOR devuelve o cierra |
+`indicators-service` valida el sobre, inserta `processed_event` bajo restricción única y actualiza hecho, dimensiones y `request_current_state` en una transacción. Duplicados no cambian indicadores. Tras dos reintentos, mensajes inválidos van a `.dlt`.
 
-Creación: `{"asunto":"Falla de acceso","descripcion":"No es posible ingresar","categoriaId":"11111111-1111-1111-1111-111111111111","prioridad":"MEDIA"}`.
+Variables: `KAFKA_EVENTS_TOPIC`, `KAFKA_EVENTS_DLT_TOPIC`, `OUTBOX_BATCH_SIZE`, `OUTBOX_POLL_INTERVAL_MS`, `OUTBOX_MAX_ATTEMPTS`, `OUTBOX_BACKOFF_SECONDS`, `OUTBOX_LOCK_TIMEOUT_SECONDS` y `KAFKA_CONSUMER_CONCURRENCY`. Local usa tres particiones/réplica 1; producción requiere replicación y capacidad acordes al tráfico.
 
-Transición: `{"estadoDestino":"RESUELTA","observacion":"Servicio restaurado"}` o, para supervisor, `{"estadoDestino":"CERRADA","motivo":"Validación completada"}`. Cada respuesta devuelve `X-Correlation-Id`; se acepta ese header solo como UUID y en otro caso se genera uno. Los errores usan `ProblemDetail` con `errorCode`, correlación y fecha. La colección completa está en `docs/http/requests-service.http` y usa tokens ficticios.
+## APIs
 
-## Identidad y permisos
+- requests-service: `http://localhost:18081`, Swagger `/swagger-ui.html`.
+- indicators-service: `http://localhost:8082`, Swagger `/swagger-ui.html`.
+- `GET /api/v1/indicadores/resumen`: ANALISTA o SUPERVISOR.
+- `GET /api/v1/indicadores/tendencia?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`: ANALISTA o SUPERVISOR, UTC, máximo 366 días.
 
-Realm `operational-requests`; SPA pública `operational-requests-web`, Authorization Code + PKCE S256, sin secreto ni Direct Access Grants. Usuarios locales: `solicitante`/`SOLICITANTE`, `analista`/`ANALISTA` y `supervisor`/`SUPERVISOR`. Sus contraseñas `LocalOnly_*` son demostrativas, no productivas; Keycloak no interpola variables en un realm exportado.
+Se permite ANALISTA porque necesita visibilidad operacional global; SOLICITANTE recibe 403 y SUPERVISOR conserva acceso. OpenAPI es público solo localmente; datos funcionales requieren JWT. Ejemplos: `docs/http/requests-service.http` y `docs/http/indicators-service.http`.
 
-El API toma `sub` como UUID estable, `preferred_username` solo como descriptor y `realm_access.roles` como autoridades `ROLE_*`. No persiste correo ni nombres. El supervisor no hereda acciones de analista.
+## Puertos y salud
 
-## Persistencia y eventos
-
-Flyway V3 añade asunto, motivo de transición, índices y la secuencia SQL Server `request_number_seq`, usada para números `SOL-año-000001` sin `MAX+1`. La toma usa un `UPDATE ... WHERE status='REGISTRADA'` atómico: cero filas produce HTTP 409. Negocio, historial y Outbox `PENDING` se escriben en una sola transacción; no se publica directamente a Kafka en esta fase.
-
-## Puertos
-
-| Servicio | Host | Salud/documentación |
+| Componente | Puerto | Comprobación |
 |---|---:|---|
-| Keycloak | 8080 | discovery del realm |
-| requests-service | 18081 | `/actuator/health`, `/swagger-ui.html` |
+| Keycloak | 8080 | realm discovery |
+| requests-service | 18081 | `/actuator/health` |
 | indicators-service | 8082 | `/actuator/health` |
-| Kafka | 9092 | interno `kafka:29092` |
-| SQL operacional | 1433 | base `operational_requests` |
-| SQL analítico | 1434 | base `operational_indicators` |
+| Kafka host/interno | 9092 / 29092 | CLI Kafka |
+| SQL operacional | 1433 | Flyway V4 |
+| SQL analítico | 1434 | Flyway V3 |
 
 ## Estado y limitaciones
 
-Implementado: categorías, alta, listado filtrado/paginado, detalle, asignación, observaciones, resolución, devolución, cierre, RBAC, errores, OpenAPI y Outbox transaccional. `requests-service` separa dominio Java puro, puertos/casos de uso y adaptadores REST/JPA/seguridad/Outbox.
-
-Pendiente: publicador Outbox, consumidor de indicadores, frontend, pruebas Karate/Testcontainers SQL Server, Helm y CI. `frontend/`, `infrastructure/helm/` y `tests/karate/` siguen reservados. Las pruebas unitarias de concurrencia no sustituyen una ejecución simultánea real contra SQL Server.
-
-Versiones fijadas: Java 21, Maven 3.9.11, Spring Boot 3.5.16, springdoc 2.8.13, JaCoCo 0.8.13, Kafka 4.1.1, Keycloak 26.7.3 y SQL Server 2022 CU20.
+Implementados: casos operacionales de Fase 2, Outbox multiinstancia, publicación Kafka, DLT, consumo idempotente, modelo actual/histórico, resumen y tendencia. Pendientes: frontend, Karate, Helm y CI. No hay exactamente-una-vez distribuido; la seguridad proviene de Outbox + idempotencia. Las pruebas unitarias no sustituyen pruebas de carga ni una topología Kafka productiva.
