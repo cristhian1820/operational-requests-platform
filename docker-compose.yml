@@ -1,0 +1,80 @@
+name: operational-requests
+services:
+  sqlserver-operational:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    environment: { ACCEPT_EULA: "Y", MSSQL_PID: Developer, MSSQL_SA_PASSWORD: "${SQLSERVER_OPERATIONAL_PASSWORD}" }
+    ports: ["${SQLSERVER_OPERATIONAL_PORT:-1433}:1433"]
+    volumes: ["sqlserver-operational-data:/var/opt/mssql"]
+    healthcheck: { test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"], interval: 10s, timeout: 5s, retries: 20, start_period: 30s }
+    networks: [backend]
+  sqlserver-operational-init:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    entrypoint: ["/bin/bash","-c","/opt/mssql-tools18/bin/sqlcmd -S sqlserver-operational -U sa -P \"$$SQLSERVER_OPERATIONAL_PASSWORD\" -C -Q \"IF DB_ID('operational_requests') IS NULL CREATE DATABASE operational_requests\""]
+    environment: { SQLSERVER_OPERATIONAL_PASSWORD: "${SQLSERVER_OPERATIONAL_PASSWORD}" }
+    depends_on: { sqlserver-operational: { condition: service_healthy } }
+    networks: [backend]
+  sqlserver-analytics:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    environment: { ACCEPT_EULA: "Y", MSSQL_PID: Developer, MSSQL_SA_PASSWORD: "${SQLSERVER_ANALYTICS_PASSWORD}" }
+    ports: ["${SQLSERVER_ANALYTICS_PORT:-1434}:1433"]
+    volumes: ["sqlserver-analytics-data:/var/opt/mssql"]
+    healthcheck: { test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"], interval: 10s, timeout: 5s, retries: 20, start_period: 30s }
+    networks: [backend]
+  sqlserver-analytics-init:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    entrypoint: ["/bin/bash","-c","/opt/mssql-tools18/bin/sqlcmd -S sqlserver-analytics -U sa -P \"$$SQLSERVER_ANALYTICS_PASSWORD\" -C -Q \"IF DB_ID('operational_indicators') IS NULL CREATE DATABASE operational_indicators\""]
+    environment: { SQLSERVER_ANALYTICS_PASSWORD: "${SQLSERVER_ANALYTICS_PASSWORD}" }
+    depends_on: { sqlserver-analytics: { condition: service_healthy } }
+    networks: [backend]
+  kafka:
+    image: apache/kafka:4.1.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: CONTROLLER://:29093,INTERNAL://:29092,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    ports: ["${KAFKA_PORT:-9092}:9092"]
+    volumes: ["kafka-data:/var/lib/kafka/data"]
+    healthcheck: { test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list >/dev/null 2>&1"], interval: 10s, timeout: 5s, retries: 15, start_period: 20s }
+    networks: [backend]
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.3
+    command: ["start-dev","--import-realm","--health-enabled=true"]
+    environment: { KC_BOOTSTRAP_ADMIN_USERNAME: "${KEYCLOAK_ADMIN}", KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}" }
+    ports: ["${KEYCLOAK_PORT:-8080}:8080"]
+    volumes: ["./infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro", "keycloak-data:/opt/keycloak/data"]
+    healthcheck: { test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000; echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3; grep -q '200 OK' <&3"], interval: 10s, timeout: 5s, retries: 20, start_period: 30s }
+    networks: [backend]
+  requests-service:
+    build: { context: ., dockerfile: backend/requests-service/Dockerfile }
+    environment:
+      REQUESTS_DB_URL: jdbc:sqlserver://sqlserver-operational:1433;databaseName=operational_requests;encrypt=true;trustServerCertificate=true
+      REQUESTS_DB_USER: sa
+      REQUESTS_DB_PASSWORD: "${SQLSERVER_OPERATIONAL_PASSWORD}"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OIDC_ISSUER_URI: http://keycloak:8080/realms/operational-requests
+    ports: ["${REQUESTS_SERVICE_PORT:-18081}:8081"]
+    depends_on: { sqlserver-operational-init: { condition: service_completed_successfully }, kafka: { condition: service_healthy }, keycloak: { condition: service_healthy } }
+    healthcheck: { test: ["CMD-SHELL", "bash -c \"exec 3<>/dev/tcp/127.0.0.1/8081; printf 'GET /actuator/health HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q 'HTTP/1.1 200' <&3\""], interval: 10s, timeout: 5s, retries: 15, start_period: 30s }
+    networks: [backend]
+  indicators-service:
+    build: { context: ., dockerfile: backend/indicators-service/Dockerfile }
+    environment:
+      INDICATORS_DB_URL: jdbc:sqlserver://sqlserver-analytics:1433;databaseName=operational_indicators;encrypt=true;trustServerCertificate=true
+      INDICATORS_DB_USER: sa
+      INDICATORS_DB_PASSWORD: "${SQLSERVER_ANALYTICS_PASSWORD}"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OIDC_ISSUER_URI: http://keycloak:8080/realms/operational-requests
+    ports: ["${INDICATORS_SERVICE_PORT:-8082}:8082"]
+    depends_on: { sqlserver-analytics-init: { condition: service_completed_successfully }, kafka: { condition: service_healthy }, keycloak: { condition: service_healthy } }
+    healthcheck: { test: ["CMD-SHELL", "bash -c \"exec 3<>/dev/tcp/127.0.0.1/8082; printf 'GET /actuator/health HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; grep -q 'HTTP/1.1 200' <&3\""], interval: 10s, timeout: 5s, retries: 15, start_period: 30s }
+    networks: [backend]
+networks: { backend: { driver: bridge } }
+volumes: { sqlserver-operational-data: {}, sqlserver-analytics-data: {}, kafka-data: {}, keycloak-data: {} }

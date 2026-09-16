@@ -1,0 +1,17 @@
+.env
+.agents/
+.idea/
+.vscode/
+*.iml
+target/
+**/target/
+node_modules/
+**/node_modules/
+coverage/
+**/coverage/
+reports/
+**/reports/
+*.tmp
+*.temp
+*.log
+.DS_Store

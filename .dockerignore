@@ -1,0 +1,15 @@
+.git
+.agents
+.env
+.idea
+.vscode
+**/target
+**/node_modules
+**/coverage
+**/reports
+*.log
+README.md
+docs
+frontend
+infrastructure/helm
+tests

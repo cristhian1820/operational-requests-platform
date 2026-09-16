@@ -1,0 +1,13 @@
+{
+  "realm":"operational-requests","enabled":true,"displayName":"Operational Requests (local demo)",
+  "roles":{"realm":[{"name":"SOLICITANTE"},{"name":"ANALISTA"},{"name":"SUPERVISOR"}]},
+  "clients":[
+    {"clientId":"operational-requests-web","name":"Future local SPA","enabled":true,"publicClient":true,"standardFlowEnabled":true,"directAccessGrantsEnabled":false,"implicitFlowEnabled":false,"redirectUris":["http://localhost:4200/"],"webOrigins":["http://localhost:4200"],"attributes":{"pkce.code.challenge.method":"S256"}},
+    {"clientId":"operational-requests-api","name":"API audience","enabled":true,"publicClient":false,"bearerOnly":true}
+  ],
+  "users":[
+    {"username":"solicitante","enabled":true,"realmRoles":["SOLICITANTE"],"credentials":[{"type":"password","value":"LocalOnly_Solicitante_2026!","temporary":true}]},
+    {"username":"analista","enabled":true,"realmRoles":["ANALISTA"],"credentials":[{"type":"password","value":"LocalOnly_Analista_2026!","temporary":true}]},
+    {"username":"supervisor","enabled":true,"realmRoles":["SUPERVISOR"],"credentials":[{"type":"password","value":"LocalOnly_Supervisor_2026!","temporary":true}]}
+  ]
+}
