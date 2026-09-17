@@ -2,7 +2,10 @@ workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_TAG'
-    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH'
+    - when: never
 
 stages:
   - validate
@@ -92,7 +95,9 @@ backend_tests:
 
 helm_validate:
   stage: validate
-  image: alpine/helm:3.17.3
+  image:
+    name: alpine/helm:3.17.3
+    entrypoint: [""]
   script:
     - helm lint infrastructure/helm/operational-requests
     - helm template operational-requests infrastructure/helm/operational-requests -f infrastructure/helm/operational-requests/values-dev.yaml > helm-rendered.yaml
@@ -119,11 +124,48 @@ karate_acceptance:
     - until docker info >/dev/null 2>&1; do sleep 2; done
   script:
     - docker compose --env-file .env.example up --build -d
-    - for url in http://localhost:18081/actuator/health http://localhost:8082/actuator/health http://localhost:4200/ http://localhost:4201/remoteEntry.js; do for attempt in $(seq 1 60); do code=$(curl -ks -o /dev/null -w '%{http_code}' "$url" || true); if [ "$code" = "200" ]; then break; fi; sleep 5; done; test "$code" = "200"; done
-    - chmod +x mvnw
-    - ./mvnw -Pacceptance -pl tests/karate -am test
+    - |
+      required_services="sqlserver-operational sqlserver-analytics kafka keycloak requests-service indicators-service requests-mfe shell"
+      for attempt in $(seq 1 60); do
+        all_healthy=true
+        for service in $required_services; do
+          container_id=$(docker compose ps -q "$service")
+          health=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+          if [ "$health" != "healthy" ]; then all_healthy=false; fi
+        done
+        if [ "$all_healthy" = true ]; then break; fi
+        sleep 5
+      done
+      test "$all_healthy" = true
+    - export COMPOSE_NETWORK="$(docker inspect "$(docker compose ps -q requests-service)" --format '{{range $name, $network := .NetworkSettings.Networks}}{{println $name}}{{end}}' | head -n 1 | tr -d '\r')"
+    - test -n "$COMPOSE_NETWORK"
+    - docker run --rm --network "$COMPOSE_NETWORK" curlimages/curl:8.11.1 --fail --silent http://requests-service:8081/actuator/health
+    - docker run --rm --network "$COMPOSE_NETWORK" curlimages/curl:8.11.1 --fail --silent http://indicators-service:8082/actuator/health
+    - docker run --rm --network "$COMPOSE_NETWORK" curlimages/curl:8.11.1 --fail --silent http://shell:8080/
+    - docker run --rm --network "$COMPOSE_NETWORK" curlimages/curl:8.11.1 --fail --silent http://requests-mfe:8080/remoteEntry.js >/dev/null
+    - mkdir -p ci-karate-context
+    - cp pom.xml mvnw ci-karate-context/
+    - cp -R .mvn tests ci-karate-context/
+    - |
+      cat > ci-karate-context/Dockerfile <<'EOF'
+      FROM maven:3.9.11-eclipse-temurin-21
+      WORKDIR /workspace
+      COPY . .
+      RUN chmod +x mvnw
+      ENTRYPOINT ["./mvnw"]
+      EOF
+    - docker build --file ci-karate-context/Dockerfile --tag karate-runner:$CI_PIPELINE_ID ci-karate-context
+    - |
+      set +e
+      docker run --name karate-runner-$CI_PIPELINE_ID --network "$COMPOSE_NETWORK" karate-runner:$CI_PIPELINE_ID -Pacceptance -pl tests/karate -am test -Drequests.api.url=http://requests-service:8081 -Dkeycloak.url=http://keycloak:8080
+      result=$?
+      mkdir -p tests/karate/target
+      docker cp karate-runner-$CI_PIPELINE_ID:/workspace/tests/karate/target/. tests/karate/target/ 2>/dev/null || true
+      docker rm karate-runner-$CI_PIPELINE_ID >/dev/null 2>&1 || true
+      exit $result
   after_script:
-    - docker compose --env-file .env.example down -v --remove-orphans || true
+    - docker rm -f karate-runner-$CI_PIPELINE_ID >/dev/null 2>&1 || true
+    - docker compose --env-file .env.example down --remove-orphans || true
   artifacts:
     when: always
     expire_in: 7 days
@@ -155,7 +197,9 @@ docker_build:
 
 security_scan:
   stage: security
-  image: aquasec/trivy:0.58.1
+  image:
+    name: aquasec/trivy:0.58.1
+    entrypoint: [""]
   script:
     - trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --no-progress .
     - trivy fs --scanners vuln --severity UNKNOWN,LOW,MEDIUM --exit-code 0 --format table --no-progress . | tee trivy-informational.txt

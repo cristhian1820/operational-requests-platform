@@ -19,6 +19,39 @@ REQUIRED_JOBS = {
 }
 
 
+def assert_pipeline_contract(document: dict, text: str) -> None:
+    helm_image = document["helm_validate"]["image"]
+    trivy_image = document["security_scan"]["image"]
+    if helm_image.get("name") != "alpine/helm:3.17.3" or helm_image.get("entrypoint") != [""]:
+        raise ValueError("helm_validate must clear the Helm image entrypoint")
+    if trivy_image.get("name") != "aquasec/trivy:0.58.1" or trivy_image.get("entrypoint") != [""]:
+        raise ValueError("security_scan must clear the Trivy image entrypoint")
+    workflow_rules = document.get("workflow", {}).get("rules", [])
+    if not any(rule.get("if") == '$CI_PIPELINE_SOURCE == "merge_request_event"' for rule in workflow_rules):
+        raise ValueError("workflow must allow merge request pipelines")
+    if not any(rule.get("if") == '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS' and rule.get("when") == "never" for rule in workflow_rules):
+        raise ValueError("workflow must suppress branch pipelines when an MR is open")
+    if not any(rule.get("if") == '$CI_COMMIT_TAG' for rule in workflow_rules):
+        raise ValueError("workflow must allow tag pipelines")
+    if not any(rule.get("if") == '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH' for rule in workflow_rules):
+        raise ValueError("workflow must allow branch push pipelines")
+    if workflow_rules[-1].get("when") != "never":
+        raise ValueError("workflow must end with when: never")
+    karate_section = text.split("\nkarate_acceptance:", 1)[1].split("\ndocker_build:", 1)[0]
+    if "localhost:" in karate_section:
+        raise ValueError("CI pipeline must not use localhost ports for DinD acceptance checks")
+    required_network_markers = (
+        'docker inspect --format',
+        'docker run --rm --network "$COMPOSE_NETWORK" curlimages/curl:8.11.1',
+        'docker run --name karate-runner-$CI_PIPELINE_ID --network "$COMPOSE_NETWORK"',
+        '-Drequests.api.url=http://requests-service:8081',
+        '-Dkeycloak.url=http://keycloak:8080',
+    )
+    missing_markers = [marker for marker in required_network_markers if marker not in text]
+    if missing_markers:
+        raise ValueError(f"DinD Karate network strategy incomplete: {missing_markers}")
+
+
 def main() -> int:
     document = yaml.safe_load(PIPELINE.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
@@ -44,6 +77,7 @@ def main() -> int:
     if missing_paths:
         raise ValueError(f"referenced paths do not exist: {missing_paths}")
     text = PIPELINE.read_text(encoding="utf-8")
+    assert_pipeline_contract(document, text)
     forbidden = ["-----BEGIN", "eyJhbGci", "client_secret:", "refresh_token:"]
     found = [pattern for pattern in forbidden if pattern in text]
     if found:
