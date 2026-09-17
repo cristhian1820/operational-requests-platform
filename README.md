@@ -89,6 +89,17 @@ Rutas: `/`, `/solicitudes`, `/solicitudes/nueva`, `/solicitudes/:id`, `/indicado
 | SQL operacional | 1433 | Flyway V4 |
 | SQL analítico | 1434 | Flyway V3 |
 
+## Pruebas de aceptación A1–A7
+
+Con el stack levantado, ejecuta la suite Karate contra contenedores reales:
+
+```powershell
+.\mvnw.cmd -Pacceptance -pl tests/karate -am test
+powershell -ExecutionPolicy Bypass -File tests/karate/verify-compose.ps1
+```
+
+El reporte HTML queda en `tests/karate/target/karate-reports/karate-summary.html`. Las credenciales del cliente técnico local se configuran con variables `KARATE_*`; el cliente SPA conserva PKCE y Direct Access Grants deshabilitado. Consulta la [matriz formal A1–A7](docs/acceptance-criteria.md).
+
 ## Estado y limitaciones
 
-Implementados: Fases 1–3 y frontend Fase 4 con shell, remoto, PKCE, RBAC visual, vistas operacionales, indicadores, Zod, MUI, pruebas y Storybook. Pendientes: Karate, Helm y CI. No existe configuración runtime externa: las URLs públicas quedan incorporadas al build. El login interactivo requiere navegador y las contraseñas temporales obligan cambio en el primer acceso. Los bundles MUI/Storybook conservan advertencias de tamaño que deberán optimizarse si las métricas productivas lo justifican.
+Implementados: Fases 1–4 y pruebas de aceptación Karate de la Fase 5 (A1-A4 y comprobación reproducible A7), con matriz formal A1-A7. Pendientes: Helm, GitLab CI y automatización de navegador para A6. No existe configuración runtime externa: las URLs públicas quedan incorporadas al build. El login interactivo requiere navegador. Los bundles MUI/Storybook conservan advertencias de tamaño que deberán optimizarse si las métricas productivas lo justifican.

@@ -3,11 +3,16 @@
   "roles":{"realm":[{"name":"SOLICITANTE"},{"name":"ANALISTA"},{"name":"SUPERVISOR"}]},
   "clients":[
     {"clientId":"operational-requests-web","name":"Local shell and requests microfrontend","enabled":true,"publicClient":true,"standardFlowEnabled":true,"directAccessGrantsEnabled":false,"implicitFlowEnabled":false,"redirectUris":["http://localhost:4200/","http://localhost:4200/*","http://localhost:4201/","http://localhost:4201/*"],"webOrigins":["http://localhost:4200","http://localhost:4201"],"attributes":{"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"http://localhost:4200/##http://localhost:4201/"}},
-    {"clientId":"operational-requests-api","name":"API audience","enabled":true,"publicClient":false,"bearerOnly":true}
+    {"clientId":"operational-requests-api","name":"API audience","enabled":true,"publicClient":false,"bearerOnly":true},
+    {"clientId":"operational-requests-acceptance","name":"Local Karate acceptance only","enabled":true,"publicClient":true,"standardFlowEnabled":false,"directAccessGrantsEnabled":true,"implicitFlowEnabled":false,"redirectUris":[],"webOrigins":[],"attributes":{"acceptance.localOnly":"true"}}
   ],
   "users":[
-    {"username":"solicitante","enabled":true,"realmRoles":["SOLICITANTE"],"credentials":[{"type":"password","value":"LocalOnly_Solicitante_2026!","temporary":true}]},
-    {"username":"analista","enabled":true,"realmRoles":["ANALISTA"],"credentials":[{"type":"password","value":"LocalOnly_Analista_2026!","temporary":true}]},
-    {"username":"supervisor","enabled":true,"realmRoles":["SUPERVISOR"],"credentials":[{"type":"password","value":"LocalOnly_Supervisor_2026!","temporary":true}]}
+    {"username":"solicitante","enabled":true,"realmRoles":["SOLICITANTE"],"credentials":[{"type":"password","value":"LocalOnly_Solicitante_2026!","temporary":false}]},
+    {"username":"analista","enabled":true,"realmRoles":["ANALISTA"],"credentials":[{"type":"password","value":"LocalOnly_Analista_2026!","temporary":false}]},
+    {"username":"supervisor","enabled":true,"realmRoles":["SUPERVISOR"],"credentials":[{"type":"password","value":"LocalOnly_Supervisor_2026!","temporary":false}]},
+    {"username":"analista2","enabled":true,"realmRoles":["ANALISTA"],"credentials":[{"type":"password","value":"LocalOnly_Analista2_2026!","temporary":false}]},
+    {"username":"karate-analista-a","firstName":"Local","lastName":"Acceptance","email":"karate-analista-a@example.invalid","emailVerified":true,"enabled":true,"realmRoles":["ANALISTA"],"credentials":[{"type":"password","value":"KarateOnly_AnalistaA_2026!","temporary":false}]},
+    {"username":"karate-analista-b","firstName":"Local","lastName":"Acceptance","email":"karate-analista-b@example.invalid","emailVerified":true,"enabled":true,"realmRoles":["ANALISTA"],"credentials":[{"type":"password","value":"KarateOnly_AnalistaB_2026!","temporary":false}]},
+    {"username":"karate-supervisor","firstName":"Local","lastName":"Acceptance","email":"karate-supervisor@example.invalid","emailVerified":true,"enabled":true,"realmRoles":["SUPERVISOR"],"credentials":[{"type":"password","value":"KarateOnly_Supervisor_2026!","temporary":false}]}
   ]
 }
