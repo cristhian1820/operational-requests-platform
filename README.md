@@ -104,6 +104,21 @@ El reporte HTML queda en `tests/karate/target/karate-reports/karate-summary.html
 
 El chart de Kubernetes está en `infrastructure/helm/operational-requests` y despliega los cuatro componentes propios. SQL Server, Kafka y Keycloak son dependencias externas. Consulta `infrastructure/helm/README.md` para `helm lint`, `helm template`, Secret externo, instalación, actualización y desinstalación.
 
+## GitLab CI
+
+`.gitlab-ci.yml` define las etapas `validate`, `test`, `acceptance`, `build`, `security` y `package`. El flujo ejecuta:
+
+- validación estática del propio YAML;
+- `npm ci`, lint, typecheck, Vitest, build y Storybook;
+- pruebas Maven con reportes JUnit;
+- Karate A1-A4 contra Compose con Docker-in-Docker y limpieza en `after_script`;
+- `helm lint` y `helm template`, conservando el manifiesto como artifact;
+- construcción de las cuatro imágenes;
+- Trivy con HIGH/CRITICAL bloqueantes y severidades menores informativas;
+- publicación al GitLab Container Registry solo en la rama por defecto o tags.
+
+El runner debe soportar Docker-in-Docker en modo privilegiado para los jobs de Compose y construcción de imágenes. Variables opcionales para el build frontend son `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `REQUESTS_API_URL`, `INDICATORS_API_URL` y `REQUESTS_MFE_URL`; los valores sensibles estándar de Registry (`CI_REGISTRY_USER`, `CI_REGISTRY_PASSWORD`) los proporciona GitLab y no se escriben en el YAML. No se requiere `.env` privado en CI: Karate usa `.env.example` y sus credenciales locales ficticias. Para validar localmente el pipeline se puede ejecutar `python -m pip install PyYAML==6.0.2` y `python tests/ci/validate-gitlab-ci.py`; CI Lint de GitLab requiere un servidor/token y no se afirma haberlo ejecutado.
+
 ## Estado y limitaciones
 
-Implementados: Fases 1–4 y pruebas de aceptación Karate de la Fase 5 (A1-A4 y comprobación reproducible A7), con matriz formal A1-A7. Pendientes: Helm, GitLab CI y automatización de navegador para A6. No existe configuración runtime externa: las URLs públicas quedan incorporadas al build. El login interactivo requiere navegador. Los bundles MUI/Storybook conservan advertencias de tamaño que deberán optimizarse si las métricas productivas lo justifican.
+Implementados: Fases 1–5, Helm de la Fase 6 y pipeline GitLab CI de la Fase 7. Pendiente: automatización de navegador para A6. No existe configuración runtime externa: las URLs públicas quedan incorporadas al build. El login interactivo requiere navegador. Los bundles MUI/Storybook conservan advertencias de tamaño que deberán optimizarse si las métricas productivas lo justifican.
