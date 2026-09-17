@@ -1,0 +1,1 @@
+import type {Preview} from '@storybook/react';import {ThemeProvider,createTheme,CssBaseline} from '@mui/material';import React from 'react';const preview:Preview={decorators:[Story=><ThemeProvider theme={createTheme()}><CssBaseline/><Story/></ThemeProvider>],parameters:{a11y:{test:'todo'}}};export default preview;

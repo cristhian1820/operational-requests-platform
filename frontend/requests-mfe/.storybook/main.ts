@@ -1,0 +1,2 @@
+import type {StorybookConfig} from '@storybook/react-webpack5';
+const config:StorybookConfig={stories:['../src/**/*.stories.@(ts|tsx)'],addons:['@storybook/addon-a11y'],framework:{name:'@storybook/react-webpack5',options:{}},webpackFinal:async cfg=>{cfg.module?.rules?.push({test:/\.tsx?$/,exclude:/node_modules/,use:[{loader:'ts-loader',options:{transpileOnly:true,configFile:'tsconfig.json'}}]});cfg.resolve={...cfg.resolve,extensions:[...(cfg.resolve?.extensions??[]),'.ts','.tsx']};return cfg;}};export default config;

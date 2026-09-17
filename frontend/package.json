@@ -1,0 +1,25 @@
+{
+  "name": "operational-requests-frontend",
+  "private": true,
+  "version": "4.0.0",
+  "workspaces": ["shared", "shell", "requests-mfe"],
+  "scripts": {
+    "build": "npm run build -w @operational/shared && npm run build -w requests-mfe && npm run build -w shell",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "storybook": "npm run storybook -w requests-mfe",
+    "build-storybook": "npm run build-storybook -w requests-mfe"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@types/node": "24.10.1",
+    "@typescript-eslint/eslint-plugin": "8.48.1",
+    "@typescript-eslint/parser": "8.48.1",
+    "eslint": "9.39.1",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "globals": "16.5.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {"node": ">=22.0.0", "npm": ">=11.0.0"}
+}

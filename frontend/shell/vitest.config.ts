@@ -1,0 +1,1 @@
+import {defineConfig} from 'vitest/config';import {fileURLToPath} from 'node:url';export default defineConfig({test:{setupFiles:['./src/setup.ts']},resolve:{alias:{'requestsMfe/Routes':fileURLToPath(new URL('./src/remote-test-stub.tsx',import.meta.url))}}});

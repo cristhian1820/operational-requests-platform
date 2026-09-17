@@ -1,15 +1,31 @@
-# Operational Requests Platform — Fase 3
+# Operational Requests Platform — Fase 4
 
-Plataforma Java 21 con API operacional, Outbox transaccional, Kafka KRaft e indicadores idempotentes sobre SQL Server.
+Plataforma Java 21 y React 19 para solicitudes operacionales. Incluye API operacional, Outbox/Kafka, indicadores idempotentes, autenticación Keycloak y frontend federado.
 
-## Arranque local
+## Arquitectura frontend
 
-Requisitos: Java 21, Docker Compose y al menos 6 GB libres.
+- `frontend/shell`: host Rspack/Module Federation en `http://localhost:4200`. Es dueño de Keycloak, sesión descriptiva Redux, layout, navegación e indicadores.
+- `frontend/requests-mfe`: remoto en `http://localhost:4201`, expone `requestsMfe/Routes` y también funciona standalone.
+- `frontend/shared`: contratos Zod, cliente HTTP, tipos y slice de sesión. No persiste tokens.
+
+React, React DOM, Router, MUI, Emotion, Redux Toolkit, React Redux y Keycloak se comparten como singleton con versiones exactas. El navegador descarga `remoteEntry.js` desde localhost; las variables son build args, por lo que cambiar URLs requiere reconstruir las imágenes.
+
+## Arranque completo
+
+Requisitos: Java 21, Docker Compose, Node 22+ y npm 11+; se recomiendan 8 GB libres.
 
 PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
+Set-Location frontend
+npm ci
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run build-storybook
+Set-Location ..
 .\mvnw.cmd clean verify
 docker compose --env-file .env config --quiet
 docker compose --env-file .env up --build -d
@@ -20,6 +36,10 @@ Bash:
 
 ```bash
 cp .env.example .env
+cd frontend
+npm ci
+npm run lint && npm run typecheck && npm run test && npm run build && npm run build-storybook
+cd ..
 ./mvnw clean verify
 docker compose --env-file .env config --quiet
 docker compose --env-file .env up --build -d
@@ -28,34 +48,47 @@ docker compose --env-file .env ps
 
 Detener conservando volúmenes: `docker compose --env-file .env down`.
 
-## Flujo de eventos
+## Desarrollo frontend sin Docker
 
-`requests-service` confirma primero negocio y Outbox. El scheduler reclama lotes pequeños atómicamente, publica en `operational-requests.events.v1` con `aggregateId` como key y marca `PUBLISHED` después del ack. Fallos usan backoff lineal, máximo configurable y recuperación de locks vencidos. La entrega es al menos una vez.
+Con infraestructura y APIs disponibles, en terminales separadas desde `frontend/`:
 
-`indicators-service` valida el sobre, inserta `processed_event` bajo restricción única y actualiza hecho, dimensiones y `request_current_state` en una transacción. Duplicados no cambian indicadores. Tras dos reintentos, mensajes inválidos van a `.dlt`.
+```text
+npm run dev -w requests-mfe
+npm run dev -w shell
+npm run storybook
+```
 
-Variables: `KAFKA_EVENTS_TOPIC`, `KAFKA_EVENTS_DLT_TOPIC`, `OUTBOX_BATCH_SIZE`, `OUTBOX_POLL_INTERVAL_MS`, `OUTBOX_MAX_ATTEMPTS`, `OUTBOX_BACKOFF_SECONDS`, `OUTBOX_LOCK_TIMEOUT_SECONDS` y `KAFKA_CONSUMER_CONCURRENCY`. Local usa tres particiones/réplica 1; producción requiere replicación y capacidad acordes al tráfico.
+El remoto debe iniciarse antes que el shell. Storybook usa el puerto 6006 y no necesita backend.
 
-## APIs
+## Sesión y seguridad
 
-- requests-service: `http://localhost:18081`, Swagger `/swagger-ui.html`.
-- indicators-service: `http://localhost:8082`, Swagger `/swagger-ui.html`.
-- `GET /api/v1/indicadores/resumen`: ANALISTA o SUPERVISOR.
-- `GET /api/v1/indicadores/tendencia?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`: ANALISTA o SUPERVISOR, UTC, máximo 366 días.
+El shell inicializa Keycloak con `check-sso`: la portada pública explica cómo iniciar sesión y una sesión SSO existente se restaura sin forzar redirección. Login usa Authorization Code + PKCE S256. Tokens y refresh tokens permanecen únicamente dentro de `keycloak-js`; Redux solo guarda `sub`, `preferred_username` y roles. Antes de cada petición se renueva el token con 30 segundos de margen. Logout vuelve al origen permitido.
 
-Se permite ANALISTA porque necesita visibilidad operacional global; SOLICITANTE recibe 403 y SUPERVISOR conserva acceso. OpenAPI es público solo localmente; datos funcionales requieren JWT. Ejemplos: `docs/http/requests-service.http` y `docs/http/indicators-service.http`.
+La recarga directa de `/solicitudes/:id` conserva la URL, recupera la sesión SSO y vuelve a consultar el detalle mostrando loading (criterio A6). Las acciones visibles responden al rol, pero backend sigue siendo la autoridad. El cliente diferencia 400/401/403/404/409/422/500 y valida respuestas críticas con Zod (A7).
+
+Usuarios exclusivamente locales: `solicitante`, `analista`, `supervisor`. Las contraseñas temporales están marcadas `LocalOnly_*` en el realm demo; no son credenciales productivas.
+
+## Navegación por rol
+
+- SOLICITANTE: bandeja propia, creación y consulta.
+- ANALISTA: bandeja global, tomar, observar y resolver solicitudes asignadas; indicadores.
+- SUPERVISOR: bandeja global, devolver/cerrar resueltas; indicadores.
+
+Rutas: `/`, `/solicitudes`, `/solicitudes/nueva`, `/solicitudes/:id`, `/indicadores`, `/sin-autorizacion` y 404.
 
 ## Puertos y salud
 
 | Componente | Puerto | Comprobación |
 |---|---:|---|
+| Shell | 4200 | `/` |
+| Requests MFE | 4201 | `/remoteEntry.js` |
 | Keycloak | 8080 | realm discovery |
-| requests-service | 18081 | `/actuator/health` |
-| indicators-service | 8082 | `/actuator/health` |
+| requests-service | 18081 | `/actuator/health`, `/v3/api-docs` |
+| indicators-service | 8082 | `/actuator/health`, `/v3/api-docs` |
 | Kafka host/interno | 9092 / 29092 | CLI Kafka |
 | SQL operacional | 1433 | Flyway V4 |
 | SQL analítico | 1434 | Flyway V3 |
 
 ## Estado y limitaciones
 
-Implementados: casos operacionales de Fase 2, Outbox multiinstancia, publicación Kafka, DLT, consumo idempotente, modelo actual/histórico, resumen y tendencia. Pendientes: frontend, Karate, Helm y CI. No hay exactamente-una-vez distribuido; la seguridad proviene de Outbox + idempotencia. Las pruebas unitarias no sustituyen pruebas de carga ni una topología Kafka productiva.
+Implementados: Fases 1–3 y frontend Fase 4 con shell, remoto, PKCE, RBAC visual, vistas operacionales, indicadores, Zod, MUI, pruebas y Storybook. Pendientes: Karate, Helm y CI. No existe configuración runtime externa: las URLs públicas quedan incorporadas al build. El login interactivo requiere navegador y las contraseñas temporales obligan cambio en el primer acceso. Los bundles MUI/Storybook conservan advertencias de tamaño que deberán optimizarse si las métricas productivas lo justifican.

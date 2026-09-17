@@ -1,0 +1,1 @@
+declare module 'requestsMfe/Routes' {import type {ComponentType} from 'react'; import type {AuthBridge} from '@operational/shared'; const Routes:ComponentType<{auth:AuthBridge}>; export default Routes;}

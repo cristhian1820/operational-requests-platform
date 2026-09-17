@@ -9,6 +9,12 @@ node_modules/
 **/node_modules/
 coverage/
 **/coverage/
+dist/
+**/dist/
+.mf/
+**/.mf/
+storybook-static/
+**/storybook-static/
 reports/
 **/reports/
 *.tmp

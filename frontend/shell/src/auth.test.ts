@@ -1,0 +1,1 @@
+import {describe,it,expect} from 'vitest'; import {realmRoles} from '@operational/shared'; describe('reconstrucción de sesión',()=>it('recupera roles del token tras una recarga',()=>expect(realmRoles({realm_access:{roles:['SOLICITANTE']}})).toEqual(['SOLICITANTE'])));

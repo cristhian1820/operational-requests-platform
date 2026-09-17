@@ -10,6 +10,7 @@
 *.log
 README.md
 docs
-frontend
+**/dist
+**/storybook-static
 infrastructure/helm
 tests

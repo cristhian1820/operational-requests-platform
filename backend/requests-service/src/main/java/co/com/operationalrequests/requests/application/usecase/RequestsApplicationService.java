@@ -147,8 +147,9 @@ public class RequestsApplicationService implements RequestsUseCase {
         payload.put("occurredAt", now); payload.putAll(extra);
         outbox.append(UUID.randomUUID(), request.id(), type, 1, correlationId, now, payload);
     }
-    private static SolicitudDetail toDetail(Solicitud r) {
-        return new SolicitudDetail(r.id(), r.numero(), r.asunto(), r.descripcion(), r.categoriaId(), r.prioridad(),
+    private SolicitudDetail toDetail(Solicitud r) {
+        String categoryName = categories.findActiveById(r.categoriaId()).map(Categoria::nombre).orElse(null);
+        return new SolicitudDetail(r.id(), r.numero(), r.asunto(), r.descripcion(), r.categoriaId(), categoryName, r.prioridad(),
                 r.estado(), r.solicitanteId(), r.analistaAsignadoId(), r.creadaEn(), r.actualizadaEn(),
                 r.observaciones(), r.historial());
     }
