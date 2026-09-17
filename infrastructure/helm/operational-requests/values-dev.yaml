@@ -1,0 +1,34 @@
+images:
+  requestsService: { repository: operational-requests/requests-service, tag: dev }
+  indicatorsService: { repository: operational-requests/indicators-service, tag: dev }
+  shell: { repository: operational-requests/shell, tag: dev }
+  requestsMfe: { repository: operational-requests/requests-mfe, tag: dev }
+
+global:
+  imagePullPolicy: IfNotPresent
+
+external:
+  requestsDatabase:
+    url: jdbc:sqlserver://sqlserver-operational.default.svc.cluster.local:1433;databaseName=operational_requests;encrypt=true;trustServerCertificate=true
+  indicatorsDatabase:
+    url: jdbc:sqlserver://sqlserver-analytics.default.svc.cluster.local:1433;databaseName=operational_indicators;encrypt=true;trustServerCertificate=true
+  kafka:
+    bootstrapServers: kafka.default.svc.cluster.local:29092
+  keycloak:
+    issuerUri: http://keycloak.default.svc.cluster.local:8080/realms/operational-requests
+    jwkSetUri: http://keycloak.default.svc.cluster.local:8080/realms/operational-requests/protocol/openid-connect/certs
+
+frontend:
+  shell:
+    keycloakUrl: http://keycloak.local
+    requestsApiUrl: http://operational-requests.local
+    indicatorsApiUrl: http://operational-requests.local
+    requestsMfeUrl: http://requests-mfe.local/remoteEntry.js
+  requestsMfe:
+    keycloakUrl: http://keycloak.local
+    requestsApiUrl: http://operational-requests.local
+    indicatorsApiUrl: http://operational-requests.local
+    requestsMfeUrl: http://requests-mfe.local/remoteEntry.js
+
+cors:
+  allowedOrigins: http://operational-requests.local,http://requests-mfe.local

@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-requests
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.requestsService.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: requests-service
+      {{- include "operational-requests.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: requests-service
+        {{- include "operational-requests.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "operational-requests.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.global.securityContext | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: requests-service
+          image: {{ include "operational-requests.image" .Values.images.requestsService | quote }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.requestsService.service.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "operational-requests.fullname" . }}-requests-config
+            - configMapRef:
+                name: {{ include "operational-requests.fullname" . }}-runtime
+          env:
+            - name: REQUESTS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "operational-requests.secretName" . }}
+                  key: requests-db-password
+          resources:
+            {{- toYaml .Values.requestsService.resources | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6

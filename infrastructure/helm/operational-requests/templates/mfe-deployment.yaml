@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-mfe
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.requestsMfe.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: requests-mfe
+      {{- include "operational-requests.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: requests-mfe
+        {{- include "operational-requests.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "operational-requests.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.global.securityContext | nindent 8 }}
+      containers:
+        - name: requests-mfe
+          image: {{ include "operational-requests.image" .Values.images.requestsMfe | quote }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.requestsMfe.service.port }}
+          resources:
+            {{- toYaml .Values.frontend.requestsMfe.resources | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /remoteEntry.js, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /remoteEntry.js, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3

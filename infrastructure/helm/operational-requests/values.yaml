@@ -1,0 +1,114 @@
+global:
+  imagePullSecrets: []
+  imagePullPolicy: IfNotPresent
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+serviceAccount:
+  create: true
+  name: ""
+  automountServiceAccountToken: false
+
+secrets:
+  # Referencia a un Secret creado fuera del chart. No se guarda ninguna contraseña aquí.
+  existingSecret: operational-requests-runtime
+  create: false
+  data:
+    requestsDbPassword: ""
+    indicatorsDbPassword: ""
+
+external:
+  requestsDatabase:
+    url: jdbc:sqlserver://sqlserver-operational:1433;databaseName=operational_requests;encrypt=true;trustServerCertificate=true
+    username: sa
+  indicatorsDatabase:
+    url: jdbc:sqlserver://sqlserver-analytics:1433;databaseName=operational_indicators;encrypt=true;trustServerCertificate=true
+    username: sa
+  kafka:
+    bootstrapServers: kafka:29092
+    eventsTopic: operational-requests.events.v1
+    eventsDltTopic: operational-requests.events.v1.dlt
+  keycloak:
+    issuerUri: http://keycloak:8080/realms/operational-requests
+    jwkSetUri: http://keycloak:8080/realms/operational-requests/protocol/openid-connect/certs
+
+images:
+  requestsService:
+    repository: ghcr.io/your-org/operational-requests-requests-service
+    tag: "0.1.0"
+  indicatorsService:
+    repository: ghcr.io/your-org/operational-requests-indicators-service
+    tag: "0.1.0"
+  shell:
+    repository: ghcr.io/your-org/operational-requests-shell
+    tag: "0.1.0"
+  requestsMfe:
+    repository: ghcr.io/your-org/operational-requests-requests-mfe
+    tag: "0.1.0"
+
+requestsService:
+  replicaCount: 1
+  service:
+    port: 8081
+  outbox:
+    batchSize: 20
+    pollIntervalMs: 2000
+    maxAttempts: 5
+    backoffSeconds: 10
+    lockTimeoutSeconds: 60
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 1, memory: 1Gi }
+
+indicatorsService:
+  replicaCount: 1
+  service:
+    port: 8082
+  consumer:
+    group: indicators-service-v1
+    concurrency: 1
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: 1, memory: 1Gi }
+
+frontend:
+  shell:
+    replicaCount: 1
+    service:
+      port: 8080
+    # Estas variables se incorporan durante npm build; el chart no puede cambiarlas en nginx en runtime.
+    keycloakUrl: http://localhost:8080
+    keycloakRealm: operational-requests
+    keycloakClientId: operational-requests-web
+    requestsApiUrl: http://requests-service:8081
+    indicatorsApiUrl: http://indicators-service:8082
+    requestsMfeUrl: http://requests-mfe:8080/remoteEntry.js
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { cpu: 250m, memory: 256Mi }
+  requestsMfe:
+    replicaCount: 1
+    service:
+      port: 8080
+    keycloakUrl: http://localhost:8080
+    keycloakRealm: operational-requests
+    keycloakClientId: operational-requests-web
+    requestsApiUrl: http://requests-service:8081
+    indicatorsApiUrl: http://indicators-service:8082
+    requestsMfeUrl: http://requests-mfe:8080/remoteEntry.js
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits: { cpu: 250m, memory: 256Mi }
+
+cors:
+  allowedOrigins: ""
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  shellHost: operational-requests.local
+  mfeHost: requests-mfe.local
+  tls: []

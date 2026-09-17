@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "required": ["images", "secrets", "external"],
+  "properties": {
+    "images": {"type": "object", "required": ["requestsService", "indicatorsService", "shell", "requestsMfe"]},
+    "secrets": {
+      "type": "object",
+      "required": ["existingSecret"],
+      "properties": {
+        "existingSecret": {"type": "string", "minLength": 1},
+        "create": {"type": "boolean"},
+        "data": {"type": "object"}
+      }
+    },
+    "external": {"type": "object", "required": ["requestsDatabase", "indicatorsDatabase", "kafka", "keycloak"]},
+    "ingress": {"type": "object", "properties": {"enabled": {"type": "boolean"}}}
+  }
+}

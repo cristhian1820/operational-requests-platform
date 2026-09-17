@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-requests
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: requests-service
+    {{- include "operational-requests.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.requestsService.service.port }}
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-indicators
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: indicators-service
+    {{- include "operational-requests.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.indicatorsService.service.port }}
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-shell
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: shell
+    {{- include "operational-requests.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.shell.service.port }}
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-mfe
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: requests-mfe
+    {{- include "operational-requests.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.requestsMfe.service.port }}
+      targetPort: http

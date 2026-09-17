@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-indicators-config
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+data:
+  INDICATORS_DB_URL: {{ .Values.external.indicatorsDatabase.url | quote }}
+  INDICATORS_DB_USER: {{ .Values.external.indicatorsDatabase.username | quote }}
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.external.kafka.bootstrapServers | quote }}
+  KAFKA_EVENTS_TOPIC: {{ .Values.external.kafka.eventsTopic | quote }}
+  KAFKA_EVENTS_DLT_TOPIC: {{ .Values.external.kafka.eventsDltTopic | quote }}
+  KAFKA_INDICATORS_GROUP: {{ .Values.indicatorsService.consumer.group | quote }}
+  KAFKA_CONSUMER_CONCURRENCY: {{ .Values.indicatorsService.consumer.concurrency | quote }}
+  OIDC_ISSUER_URI: {{ .Values.external.keycloak.issuerUri | quote }}
+  OIDC_JWK_SET_URI: {{ .Values.external.keycloak.jwkSetUri | quote }}

@@ -1,0 +1,13 @@
+1. Componentes desplegados:
+   - requests-service: {{ include "operational-requests.fullname" . }}-requests:{{ .Values.requestsService.service.port }}
+   - indicators-service: {{ include "operational-requests.fullname" . }}-indicators:{{ .Values.indicatorsService.service.port }}
+   - shell: {{ include "operational-requests.fullname" . }}-shell:{{ .Values.frontend.shell.service.port }}
+   - requests-mfe: {{ include "operational-requests.fullname" . }}-mfe:{{ .Values.frontend.requestsMfe.service.port }}
+
+2. Asegúrate de crear el Secret externo antes de desplegar:
+   kubectl create secret generic {{ include "operational-requests.secretName" . }} \
+     --from-literal=requests-db-password='<valor-externo>' \
+     --from-literal=indicators-db-password='<valor-externo>'
+
+3. SQL Server, Kafka y Keycloak son dependencias externas y no son creados por este chart.
+4. Comprueba el estado con: kubectl get pods,svc -l app.kubernetes.io/instance={{ .Release.Name }}

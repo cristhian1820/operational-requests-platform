@@ -100,6 +100,10 @@ powershell -ExecutionPolicy Bypass -File tests/karate/verify-compose.ps1
 
 El reporte HTML queda en `tests/karate/target/karate-reports/karate-summary.html`. Las credenciales del cliente técnico local se configuran con variables `KARATE_*`; el cliente SPA conserva PKCE y Direct Access Grants deshabilitado. Consulta la [matriz formal A1–A7](docs/acceptance-criteria.md).
 
+## Helm
+
+El chart de Kubernetes está en `infrastructure/helm/operational-requests` y despliega los cuatro componentes propios. SQL Server, Kafka y Keycloak son dependencias externas. Consulta `infrastructure/helm/README.md` para `helm lint`, `helm template`, Secret externo, instalación, actualización y desinstalación.
+
 ## Estado y limitaciones
 
 Implementados: Fases 1–4 y pruebas de aceptación Karate de la Fase 5 (A1-A4 y comprobación reproducible A7), con matriz formal A1-A7. Pendientes: Helm, GitLab CI y automatización de navegador para A6. No existe configuración runtime externa: las URLs públicas quedan incorporadas al build. El login interactivo requiere navegador. Los bundles MUI/Storybook conservan advertencias de tamaño que deberán optimizarse si las métricas productivas lo justifican.

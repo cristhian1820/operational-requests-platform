@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "operational-requests.fullname" . }}-requests-config
+  labels:
+    {{- include "operational-requests.labels" . | nindent 4 }}
+data:
+  REQUESTS_DB_URL: {{ .Values.external.requestsDatabase.url | quote }}
+  REQUESTS_DB_USER: {{ .Values.external.requestsDatabase.username | quote }}
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.external.kafka.bootstrapServers | quote }}
+  KAFKA_EVENTS_TOPIC: {{ .Values.external.kafka.eventsTopic | quote }}
+  OIDC_ISSUER_URI: {{ .Values.external.keycloak.issuerUri | quote }}
+  OIDC_JWK_SET_URI: {{ .Values.external.keycloak.jwkSetUri | quote }}
+  OUTBOX_BATCH_SIZE: {{ .Values.requestsService.outbox.batchSize | quote }}
+  OUTBOX_POLL_INTERVAL_MS: {{ .Values.requestsService.outbox.pollIntervalMs | quote }}
+  OUTBOX_MAX_ATTEMPTS: {{ .Values.requestsService.outbox.maxAttempts | quote }}
+  OUTBOX_BACKOFF_SECONDS: {{ .Values.requestsService.outbox.backoffSeconds | quote }}
+  OUTBOX_LOCK_TIMEOUT_SECONDS: {{ .Values.requestsService.outbox.lockTimeoutSeconds | quote }}
