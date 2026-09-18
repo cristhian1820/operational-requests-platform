@@ -2,13 +2,9 @@ package co.com.operationalrequests.requests.domain.model;
 
 import co.com.operationalrequests.requests.domain.exception.AccesoDominioNoPermitidoException;
 import co.com.operationalrequests.requests.domain.exception.TransicionEstadoInvalidaException;
+
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public final class Solicitud {
     private static final Map<EstadoSolicitud, Set<EstadoSolicitud>> TRANSICIONES = Map.of(
@@ -30,12 +26,12 @@ public final class Solicitud {
     private EstadoSolicitud estado;
     private UUID analistaAsignadoId;
     private Instant actualizadaEn;
-    private long version;
+    private final long version;
 
     private Solicitud(UUID id, String numero, String asunto, UUID categoriaId, UUID solicitanteId,
-            Prioridad prioridad, String descripcion, EstadoSolicitud estado, UUID analistaAsignadoId,
-            Instant creadaEn, Instant actualizadaEn, long version, List<Observacion> observaciones,
-            List<HistorialEstado> historial) {
+                      Prioridad prioridad, String descripcion, EstadoSolicitud estado, UUID analistaAsignadoId,
+                      Instant creadaEn, Instant actualizadaEn, long version, List<Observacion> observaciones,
+                      List<HistorialEstado> historial) {
         this.id = Objects.requireNonNull(id);
         this.numero = requerido(numero, "El número es obligatorio", 24);
         this.asunto = requerido(asunto, "El asunto es obligatorio", 200);
@@ -53,7 +49,7 @@ public final class Solicitud {
     }
 
     public static Solicitud crear(UUID id, String numero, String asunto, UUID categoriaId,
-            UUID solicitanteId, Prioridad prioridad, String descripcion, Instant ahora) {
+                                  UUID solicitanteId, Prioridad prioridad, String descripcion, Instant ahora) {
         var inicial = new HistorialEstado(UUID.randomUUID(), null, EstadoSolicitud.REGISTRADA,
                 solicitanteId, RolActor.SOLICITANTE, null, ahora);
         return new Solicitud(id, numero, asunto, categoriaId, solicitanteId, prioridad, descripcion,
@@ -61,9 +57,9 @@ public final class Solicitud {
     }
 
     public static Solicitud reconstruir(UUID id, String numero, String asunto, UUID categoriaId,
-            UUID solicitanteId, Prioridad prioridad, String descripcion, EstadoSolicitud estado,
-            UUID analistaAsignadoId, Instant creadaEn, Instant actualizadaEn, long version,
-            List<Observacion> observaciones, List<HistorialEstado> historial) {
+                                        UUID solicitanteId, Prioridad prioridad, String descripcion, EstadoSolicitud estado,
+                                        UUID analistaAsignadoId, Instant creadaEn, Instant actualizadaEn, long version,
+                                        List<Observacion> observaciones, List<HistorialEstado> historial) {
         return new Solicitud(id, numero, asunto, categoriaId, solicitanteId, prioridad, descripcion,
                 estado, analistaAsignadoId, creadaEn, actualizadaEn, version, observaciones, historial);
     }
@@ -110,7 +106,10 @@ public final class Solicitud {
     }
 
     private void transicionar(EstadoSolicitud destino, UUID actorId, RolActor rol, String motivo, Instant ahora) {
-        Objects.requireNonNull(destino); Objects.requireNonNull(actorId); Objects.requireNonNull(rol); Objects.requireNonNull(ahora);
+        Objects.requireNonNull(destino);
+        Objects.requireNonNull(actorId);
+        Objects.requireNonNull(rol);
+        Objects.requireNonNull(ahora);
         if (!TRANSICIONES.getOrDefault(estado, Set.of()).contains(destino)) {
             throw new TransicionEstadoInvalidaException(estado, destino);
         }
@@ -127,11 +126,59 @@ public final class Solicitud {
         return limpio;
     }
 
-    public UUID id() { return id; } public String numero() { return numero; } public String asunto() { return asunto; }
-    public UUID categoriaId() { return categoriaId; } public UUID solicitanteId() { return solicitanteId; }
-    public Prioridad prioridad() { return prioridad; } public String descripcion() { return descripcion; }
-    public EstadoSolicitud estado() { return estado; } public UUID analistaAsignadoId() { return analistaAsignadoId; }
-    public Instant creadaEn() { return creadaEn; } public Instant actualizadaEn() { return actualizadaEn; }
-    public long version() { return version; } public List<Observacion> observaciones() { return List.copyOf(observaciones); }
-    public List<HistorialEstado> historial() { return List.copyOf(historial); }
+    public UUID id() {
+        return id;
+    }
+
+    public String numero() {
+        return numero;
+    }
+
+    public String asunto() {
+        return asunto;
+    }
+
+    public UUID categoriaId() {
+        return categoriaId;
+    }
+
+    public UUID solicitanteId() {
+        return solicitanteId;
+    }
+
+    public Prioridad prioridad() {
+        return prioridad;
+    }
+
+    public String descripcion() {
+        return descripcion;
+    }
+
+    public EstadoSolicitud estado() {
+        return estado;
+    }
+
+    public UUID analistaAsignadoId() {
+        return analistaAsignadoId;
+    }
+
+    public Instant creadaEn() {
+        return creadaEn;
+    }
+
+    public Instant actualizadaEn() {
+        return actualizadaEn;
+    }
+
+    public long version() {
+        return version;
+    }
+
+    public List<Observacion> observaciones() {
+        return List.copyOf(observaciones);
+    }
+
+    public List<HistorialEstado> historial() {
+        return List.copyOf(historial);
+    }
 }

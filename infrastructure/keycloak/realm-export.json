@@ -2,7 +2,7 @@
   "realm":"operational-requests","enabled":true,"displayName":"Operational Requests (local demo)",
   "roles":{"realm":[{"name":"SOLICITANTE"},{"name":"ANALISTA"},{"name":"SUPERVISOR"}]},
   "clients":[
-    {"clientId":"operational-requests-web","name":"Local shell and requests microfrontend","enabled":true,"publicClient":true,"standardFlowEnabled":true,"directAccessGrantsEnabled":false,"implicitFlowEnabled":false,"redirectUris":["http://localhost:4200/","http://localhost:4200/*","http://localhost:4201/","http://localhost:4201/*"],"webOrigins":["http://localhost:4200","http://localhost:4201"],"attributes":{"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"http://localhost:4200/##http://localhost:4201/"}},
+    {"clientId":"operational-requests-web","name":"Local shell and requests microfrontend","enabled":true,"publicClient":true,"standardFlowEnabled":true,"directAccessGrantsEnabled":false,"implicitFlowEnabled":false,"redirectUris":["http://localhost:4200/","http://localhost:4200/*","http://localhost:4201/","http://localhost:4201/*"],"webOrigins":["http://localhost:4200","http://localhost:4201"],"attributes":{"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"http://localhost:4200##http://localhost:4200/##http://localhost:4200/*##http://localhost:4201/##http://localhost:4201/*"}},
     {"clientId":"operational-requests-api","name":"API audience","enabled":true,"publicClient":false,"bearerOnly":true},
     {"clientId":"operational-requests-acceptance","name":"Local Karate acceptance only","enabled":true,"publicClient":true,"standardFlowEnabled":false,"directAccessGrantsEnabled":true,"implicitFlowEnabled":false,"redirectUris":[],"webOrigins":[],"attributes":{"acceptance.localOnly":"true"}}
   ],

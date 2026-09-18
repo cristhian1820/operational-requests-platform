@@ -20,5 +20,5 @@ export async function initializeAuth() {
 }
 
 export function authBridge(session: AuthBridge['session']): AuthBridge {
-  return { session, authTokenProvider: shellTokenProvider(), login: () => keycloak.login({ redirectUri: location.href }), logout: () => keycloak.logout({ redirectUri: location.origin }) };
+  return { session, authTokenProvider: shellTokenProvider(), login: () => keycloak.login({ redirectUri: location.href }), logout: () => keycloak.logout({ redirectUri: `${window.location.origin}/` }) };
 }

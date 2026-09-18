@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 public record HistorialEstado(UUID id, EstadoSolicitud estadoAnterior, EstadoSolicitud estadoNuevo,
-        UUID actorId, RolActor rolActor, String motivo, Instant ocurridoEn) {
+                              UUID actorId, RolActor rolActor, String motivo, Instant ocurridoEn) {
     public HistorialEstado {
         Objects.requireNonNull(id, "El id del historial es obligatorio");
         Objects.requireNonNull(estadoNuevo, "El estado nuevo es obligatorio");
